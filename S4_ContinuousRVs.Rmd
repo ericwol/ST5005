@@ -1,0 +1,202 @@
+---
+title: "ST5005 — Section 4: Continuous Random Variables in R"
+subtitle: "Self-study companion"
+author: "Statistics, School of Mathematical Sciences, University College Cork"
+date: "2026-27"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+    theme: flatly
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo=TRUE, fig.height=3.5, fig.width=6,
+                      fig.align="center", comment="")
+maxtp <- c(8.2, 8.4, 11.9, 11.6, 11.0, 10.1, 8.3,  6.4,  6.7, 11.7,
+           11.1,11.1,  9.9,  9.9,  7.1,  3.7,  3.2,  5.1,  5.5,  7.5,
+            9.0, 9.4,  8.5,  8.9, 10.4,  7.1,  6.1,  9.7, 10.9,  9.0, 9.5)
+```
+
+## 1. The Normal distribution
+
+### Probabilities and quantiles
+
+```{r normal-probs}
+# P(H_M > 190) where H_M ~ N(178, 7^2)
+pnorm(190, mean=178, sd=7, lower.tail=FALSE)
+
+# P(165 < H_M < 185)
+pnorm(185, 178, 7) - pnorm(165, 178, 7)
+
+# 90th percentile of male heights
+qnorm(0.90, 178, 7)
+```
+
+**Try it:** Answer the Tutorial 6 questions for female heights
+$H_F \sim N(165, 6^2)$.
+
+```{r ex-normal-female, exercise=TRUE}
+mu_f <- 165; sd_f <- 6
+
+# P(H_F > 175)
+pnorm(175, mu_f, sd_f, lower.tail=FALSE)
+
+# 25th percentile (lower quartile)
+qnorm(0.25, mu_f, sd_f)
+
+# What height does a woman need to be taller than 90% of other women?
+qnorm(0.90, mu_f, sd_f)
+```
+
+### Visualising Normal PDFs
+
+```{r normal-plot, fig.width=9}
+x <- seq(140, 210, length.out=300)
+par(mfrow=c(1,2))
+
+plot(x, dnorm(x, 178, 7), type="l", lwd=2, col="steelblue",
+     main="Irish adult heights", xlab="Height (cm)", ylab="Density",
+     xlim=c(140, 210))
+lines(x, dnorm(x, 165, 6), lwd=2, col="coral")
+legend("topright", legend=c("Male N(178,7²)","Female N(165,6²)"),
+       col=c("steelblue","coral"), lwd=2, bty="n", cex=0.8)
+
+qqnorm(maxtp, main="Q-Q plot: Cork Airport maxtp", pch=19, col="steelblue")
+qqline(maxtp, col="coral", lwd=2)
+```
+
+**Try it:** Shade the area corresponding to $P(H_M > 190)$ under the Normal
+curve.
+
+```{r ex-normal-shade, exercise=TRUE}
+mu <- 178; sigma <- 7
+x  <- seq(mu - 4*sigma, mu + 4*sigma, length.out=300)
+
+plot(x, dnorm(x, mu, sigma), type="l", lwd=2, col="steelblue",
+     main="P(H_M > 190) shaded",
+     xlab="Height (cm)", ylab="Density")
+
+# Shade the tail
+x_tail <- seq(190, mu + 4*sigma, length.out=100)
+polygon(c(190, x_tail, mu + 4*sigma),
+        c(0, dnorm(x_tail, mu, sigma), 0),
+        col=adjustcolor("coral", 0.5), border=NA)
+abline(v=190, lty=2, col="coral")
+text(193, 0.02, round(pnorm(190, mu, sigma, lower.tail=FALSE), 4),
+     col="coral", cex=0.9)
+```
+
+---
+
+## 2. The Exponential distribution
+
+$T \sim \mathrm{Exp}(\lambda = 1/8)$: time between customer arrivals (minutes).
+
+```{r exponential}
+lam <- 1/8
+pexp(5,  rate=lam)                      # P(T <= 5)
+pexp(15, rate=lam, lower.tail=FALSE)    # P(T > 15)
+# Memoryless: P(T > 5 | T > 10) = P(T > 5)
+pexp(5, rate=lam, lower.tail=FALSE)
+```
+
+**Try it:** Verify the memoryless property by simulation. Generate 100,000
+exponential waiting times and check that conditioning on $T > 10$ does not
+change the distribution of remaining time.
+
+```{r ex-exp-memoryless, exercise=TRUE}
+set.seed(42)
+lam <- 1/8
+T   <- rexp(100000, rate=lam)
+
+# Unconditional P(T > 5)
+cat("P(T > 5):            ", round(mean(T > 5), 4), "\n")
+
+# Conditional P(T > 15 | T > 10) = P(remaining > 5 | already waited 10)
+T_given_gt10 <- T[T > 10] - 10
+cat("P(T > 5 | T > 10):   ", round(mean(T_given_gt10 > 5), 4), "\n")
+```
+
+**Try it:** Plot the Exponential PDF for different values of $\lambda$.
+
+```{r ex-exp-plot, exercise=TRUE}
+t_seq <- seq(0, 60, length.out=300)
+plot(t_seq, dexp(t_seq, 1/8), type="l", lwd=2, col="steelblue",
+     ylim=c(0, 0.3),
+     main="Exponential PDFs for different λ",
+     xlab="Time (minutes)", ylab="Density")
+lines(t_seq, dexp(t_seq, 1/4),  col="coral",    lwd=2)
+lines(t_seq, dexp(t_seq, 1/20), col="seagreen", lwd=2)
+legend("topright",
+       legend=c("λ=1/8 (mean=8)","λ=1/4 (mean=4)","λ=1/20 (mean=20)"),
+       col=c("steelblue","coral","seagreen"), lwd=2, bty="n", cex=0.8)
+```
+
+---
+
+## 3. Assessing Normality
+
+```{r normality, fig.width=9}
+par(mfrow=c(1,2))
+hist(maxtp, col="steelblue", border="white", breaks=8,
+     main="Cork Airport max temp", xlab="°C")
+qqnorm(maxtp, pch=19, col="steelblue",
+       main="Q-Q plot")
+qqline(maxtp, col="coral", lwd=2)
+```
+
+```{r shapiro}
+shapiro.test(maxtp)
+```
+
+$p < 0.05$: significant departure from Normality, consistent with the Q-Q
+plot. Always use the formal test alongside the plot.
+
+**Try it:** Generate a sample from a truly Normal distribution and check that
+the Q-Q plot looks linear and Shapiro-Wilk gives $p > 0.05$.
+
+```{r ex-normality, exercise=TRUE}
+set.seed(42)
+x_normal <- rnorm(31, mean=8.61, sd=2.31)  # same n, mean, sd as Cork data
+
+par(mfrow=c(1,2))
+hist(x_normal, col="steelblue", border="white",
+     main="Simulated Normal sample", xlab="Value")
+qqnorm(x_normal, pch=19, col="steelblue", main="Q-Q plot")
+qqline(x_normal, col="coral", lwd=2)
+
+shapiro.test(x_normal)
+```
+
+---
+
+## 4. The `faithful` dataset — bimodal distribution
+
+Old Faithful eruption durations illustrate why checking shape matters
+before applying Normal-based methods.
+
+```{r faithful-plot, fig.width=9}
+par(mfrow=c(1,2))
+hist(faithful$eruptions, breaks=20, col="steelblue", border="white",
+     main="Old Faithful eruption durations",
+     xlab="Duration (minutes)")
+plot(density(faithful$eruptions, bw="SJ"), lwd=2, col="steelblue",
+     main="KDE", xlab="Duration (minutes)", ylab="Density")
+```
+
+**Try it:** Run a Shapiro-Wilk test on `faithful$eruptions`. What does the
+result tell you, and does it match what the plots show?
+
+```{r ex-faithful, exercise=TRUE}
+shapiro.test(faithful$eruptions)
+
+# Also check the scatter plot of eruption duration vs waiting time
+plot(faithful$waiting, faithful$eruptions,
+     pch=19, col="steelblue",
+     xlab="Waiting time (minutes)",
+     ylab="Eruption duration (minutes)",
+     main="Old Faithful: eruption vs waiting time")
+```

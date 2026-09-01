@@ -1,0 +1,222 @@
+---
+title: "ST5005 — Section 7: Hypothesis Testing in R"
+subtitle: "Self-study companion"
+author: "Statistics, School of Mathematical Sciences, University College Cork"
+date: "2026-27"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+    theme: flatly
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo=TRUE, fig.height=3.5, fig.width=6,
+                      fig.align="center", comment="")
+maxtp <- c(8.2, 8.4, 11.9, 11.6, 11.0, 10.1, 8.3,  6.4,  6.7, 11.7,
+           11.1,11.1,  9.9,  9.9,  7.1,  3.7,  3.2,  5.1,  5.5,  7.5,
+            9.0, 9.4,  8.5,  8.9, 10.4,  7.1,  6.1,  9.7, 10.9,  9.0, 9.5)
+```
+
+## 1. One-sample $t$-test
+
+Is the mean January maximum temperature at Cork Airport significantly
+different from 9°C?
+
+```{r one-sample}
+maxtp <- c(8.2, 8.4, 11.9, 11.6, 11.0, 10.1, 8.3,  6.4,  6.7, 11.7,
+           11.1,11.1,  9.9,  9.9,  7.1,  3.7,  3.2,  5.1,  5.5,  7.5,
+            9.0, 9.4,  8.5,  8.9, 10.4,  7.1,  6.1,  9.7, 10.9,  9.0, 9.5)
+t.test(maxtp, mu=9, alternative="two.sided")
+```
+
+$p > 0.05$: no significant evidence the true mean differs from 9°C, despite
+the sample mean being 8.61°C.
+
+**Try it:** Test $H_0: \mu = 8$ instead. What changes? Try a one-sided test
+($H_A: \mu > 8$) by setting `alternative="greater"`.
+
+```{r ex-onesample, exercise=TRUE}
+maxtp <- c(8.2, 8.4, 11.9, 11.6, 11.0, 10.1, 8.3,  6.4,  6.7, 11.7,
+           11.1,11.1,  9.9,  9.9,  7.1,  3.7,  3.2,  5.1,  5.5,  7.5,
+            9.0, 9.4,  8.5,  8.9, 10.4,  7.1,  6.1,  9.7, 10.9,  9.0, 9.5)
+
+# Change mu and alternative below
+t.test(maxtp, mu=8, alternative="two.sided")
+```
+
+---
+
+## 2. Paired $t$-test
+
+The `sleep` dataset: extra sleep (hours) for 10 patients under two drugs.
+
+```{r paired}
+head(sleep, 4)
+d1 <- sleep$extra[sleep$group == 1]
+d2 <- sleep$extra[sleep$group == 2]
+t.test(d2, d1, paired=TRUE, alternative="greater")
+```
+
+Drug 2 produces significantly more additional sleep than Drug 1.
+
+**Try it:** Compute and plot the paired differences directly, then verify
+that testing the differences with a one-sample $t$-test gives the same result.
+
+```{r ex-paired, exercise=TRUE}
+d1   <- sleep$extra[sleep$group == 1]
+d2   <- sleep$extra[sleep$group == 2]
+diff <- d2 - d1
+
+cat("Differences:", diff, "\n")
+cat("Mean diff:  ", round(mean(diff), 4), "\n")
+
+# One-sample t-test on differences — should match paired t-test above
+t.test(diff, mu=0, alternative="greater")
+```
+
+---
+
+## 3. Two-sample $t$-test
+
+Do plant weights differ between control and treatment 1 in `PlantGrowth`?
+
+```{r two-sample}
+ctrl <- PlantGrowth$weight[PlantGrowth$group == "ctrl"]
+trt1 <- PlantGrowth$weight[PlantGrowth$group == "trt1"]
+cat("Control mean:", round(mean(ctrl), 3), "\n")
+cat("Trt1 mean:   ", round(mean(trt1), 3), "\n")
+t.test(ctrl, trt1, var.equal=FALSE)
+```
+
+```{r twosampl-plot}
+boxplot(weight ~ group, data=PlantGrowth,
+        col=c("steelblue","coral","seagreen"), border="grey30",
+        main="Plant weights by group",
+        xlab="Group", ylab="Weight (g)")
+```
+
+**Try it:** Compare control vs treatment 2 instead. Is there a significant
+difference? Which comparison gives a lower $p$-value?
+
+```{r ex-twosample, exercise=TRUE}
+ctrl <- PlantGrowth$weight[PlantGrowth$group == "ctrl"]
+trt2 <- PlantGrowth$weight[PlantGrowth$group == "trt2"]
+
+cat("Control mean:", round(mean(ctrl), 3), "\n")
+cat("Trt2 mean:   ", round(mean(trt2), 3), "\n")
+
+t.test(ctrl, trt2, var.equal=FALSE)
+```
+
+---
+
+## 4. Chi-squared test of independence
+
+Library satisfaction by year of study (Tutorial 10 dataset).
+
+```{r chisq}
+mat <- matrix(c(42, 38, 29, 21,
+                28, 32, 41, 49),
+              nrow=2, byrow=TRUE,
+              dimnames=list(c("Satisfied","Not satisfied"),
+                            paste("Year", 1:4)))
+mat
+chisq.test(mat)
+```
+
+**Try it:** Inspect the expected frequencies and the residuals to see which
+cells drive the significant result.
+
+```{r ex-chisq, exercise=TRUE}
+mat <- matrix(c(42, 38, 29, 21,
+                28, 32, 41, 49),
+              nrow=2, byrow=TRUE,
+              dimnames=list(c("Satisfied","Not satisfied"),
+                            paste("Year", 1:4)))
+result <- chisq.test(mat)
+
+cat("Expected frequencies:\n"); print(round(result$expected, 1))
+cat("\nPearson residuals (O-E)/sqrt(E):\n")
+print(round(result$residuals, 2))
+```
+
+---
+
+## 5. One-way ANOVA
+
+Compare all three groups in `PlantGrowth` simultaneously.
+
+```{r anova}
+fit <- aov(weight ~ group, data=PlantGrowth)
+summary(fit)
+TukeyHSD(fit)
+```
+
+The overall ANOVA is significant. Tukey HSD shows trt1 is significantly
+lower than ctrl, and trt2 significantly higher.
+
+**Try it:** Check the ANOVA assumptions using residual plots.
+
+```{r ex-anova, exercise=TRUE}
+fit <- aov(weight ~ group, data=PlantGrowth)
+par(mfrow=c(1,2))
+plot(fit, which=1, pch=19, col="steelblue")   # residuals vs fitted
+plot(fit, which=2, pch=19, col="steelblue")   # Q-Q plot of residuals
+```
+
+---
+
+## 6. Visualising the $p$-value
+
+```{r pvalue-plot}
+test_res <- t.test(maxtp, mu=9)
+t_stat   <- test_res$statistic
+df_val   <- test_res$parameter
+
+t_seq <- seq(-4, 4, length.out=300)
+plot(t_seq, dt(t_seq, df_val), type="l", lwd=2,
+     main=paste0("t(", df_val, ") distribution — H₀: μ = 9"),
+     xlab="t", ylab="Density")
+
+t_abs  <- abs(t_stat)
+t_tail <- seq(t_abs, 4, length.out=100)
+polygon(c(t_tail, rev(t_tail)),
+        c(dt(t_tail, df_val), rep(0, 100)),
+        col=adjustcolor("coral", 0.5), border=NA)
+t_tail2 <- seq(-4, -t_abs, length.out=100)
+polygon(c(t_tail2, rev(t_tail2)),
+        c(dt(t_tail2, df_val), rep(0, 100)),
+        col=adjustcolor("coral", 0.5), border=NA)
+abline(v=c(-t_abs, t_abs), lty=2, col="coral")
+text(t_abs+0.1, 0.3, paste0("t = ", round(t_stat, 3)), adj=0, cex=0.85)
+text(0, 0.1, paste0("p = ", round(test_res$p.value, 3)), cex=0.9)
+```
+
+**Try it:** Change $\mu_0$ to 10 and redraw the plot. Does the $p$-value
+get smaller or larger? Why?
+
+```{r ex-pvalue, exercise=TRUE}
+maxtp <- c(8.2, 8.4, 11.9, 11.6, 11.0, 10.1, 8.3,  6.4,  6.7, 11.7,
+           11.1,11.1,  9.9,  9.9,  7.1,  3.7,  3.2,  5.1,  5.5,  7.5,
+            9.0, 9.4,  8.5,  8.9, 10.4,  7.1,  6.1,  9.7, 10.9,  9.0, 9.5)
+
+mu0      <- 10    # try 9, 8, 7
+test_res <- t.test(maxtp, mu=mu0)
+t_stat   <- test_res$statistic
+df_val   <- test_res$parameter
+
+t_seq <- seq(-5, 5, length.out=300)
+plot(t_seq, dt(t_seq, df_val), type="l", lwd=2,
+     main=paste0("H₀: μ = ", mu0, "   p = ", round(test_res$p.value, 4)),
+     xlab="t", ylab="Density")
+t_abs <- abs(t_stat)
+for (s in c(1,-1)) {
+  t_r <- seq(s*t_abs, s*5, length.out=100)
+  polygon(c(t_r, rev(t_r)), c(dt(t_r, df_val), rep(0,100)),
+          col=adjustcolor("coral", 0.5), border=NA)
+}
+abline(v=c(-t_abs, t_abs), lty=2, col="coral")
+```

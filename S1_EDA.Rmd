@@ -1,0 +1,214 @@
+---
+title: "ST5005 — Section 1: Exploratory Data Analysis in R"
+subtitle: "Self-study companion"
+author: "Statistics, School of Mathematical Sciences, University College Cork"
+date: "2026-27"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+    theme: flatly
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo=TRUE, fig.height=3.5, fig.width=6,
+                      fig.align="center", comment="")
+
+# Make the Cork data available in all exercise chunks
+maxtp <- c(8.2, 8.4, 11.9, 11.6, 11.0, 10.1, 8.3,  6.4,  6.7, 11.7,
+           11.1,11.1,  9.9,  9.9,  7.1,  3.7,  3.2,  5.1,  5.5,  7.5,
+            9.0, 9.4,  8.5,  8.9, 10.4,  7.1,  6.1,  9.7, 10.9,  9.0, 9.5)
+n <- length(maxtp)
+days <- 1:n
+```
+
+## The data
+
+We use daily maximum air temperature (°C) recorded at Cork Airport during
+January 2023, downloaded from Met Éireann (`met.ie`).
+
+```{r show-data}
+maxtp <- c(8.2, 8.4, 11.9, 11.6, 11.0, 10.1, 8.3,  6.4,  6.7, 11.7,
+           11.1,11.1,  9.9,  9.9,  7.1,  3.7,  3.2,  5.1,  5.5,  7.5,
+            9.0, 9.4,  8.5,  8.9, 10.4,  7.1,  6.1,  9.7, 10.9,  9.0, 9.5)
+n <- length(maxtp)
+maxtp
+```
+
+**Try it:** How many observations are there? What were the minimum and maximum
+temperatures recorded?
+
+```{r ex-basics, exercise=TRUE}
+# Edit and run this box freely
+length(maxtp)
+min(maxtp)
+max(maxtp)
+```
+
+---
+
+## 1. Frequency table
+
+```{r freq-table}
+breaks <- c(3, 5, 7, 9, 11, 13)
+intervals <- cut(maxtp, breaks=breaks, right=FALSE, include.lowest=TRUE)
+freq   <- table(intervals)
+rel    <- freq / n
+cumrel <- cumsum(rel)
+data.frame(Frequency  = as.integer(freq),
+           Relative   = round(rel,    3),
+           Cumulative = round(cumrel, 3))
+```
+
+**Try it:** Change the class width from 2°C to 1°C by editing the `breaks`
+vector below. How does the table change?
+
+```{r ex-freqtable, exercise=TRUE}
+breaks_new <- c(3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
+intervals_new <- cut(maxtp, breaks=breaks_new, right=FALSE, include.lowest=TRUE)
+table(intervals_new)
+```
+
+---
+
+## 2. Histogram and box plot
+
+```{r hist-box, fig.width=10}
+par(mfrow=c(1,2))
+hist(maxtp, breaks=c(3,5,7,9,11,13), col="steelblue", border="white",
+     main="Daily max temperature, Cork Airport\nJanuary 2023",
+     xlab="Temperature (°C)", ylab="Frequency")
+abline(v=mean(maxtp),   col="red",    lwd=2, lty=1)
+abline(v=median(maxtp), col="orange", lwd=2, lty=2)
+legend("topleft", legend=c("Mean","Median"),
+       col=c("red","orange"), lwd=2, lty=1:2, bty="n", cex=0.8)
+
+boxplot(maxtp, col="steelblue", border="grey30", horizontal=TRUE,
+        main="Box plot", xlab="Temperature (°C)", pch=19)
+```
+
+**Try it:** Change the number of histogram bins by editing `breaks` below.
+Try `breaks=10` or `breaks=5`. Notice how the apparent shape changes.
+
+```{r ex-hist, exercise=TRUE}
+hist(maxtp, breaks=6, col="steelblue", border="white",
+     main="Histogram — try changing breaks",
+     xlab="Temperature (°C)")
+abline(v=mean(maxtp),   col="red",    lwd=2, lty=1)
+abline(v=median(maxtp), col="orange", lwd=2, lty=2)
+```
+
+---
+
+## 3. Measures of centre and spread
+
+```{r summaries}
+cat("Mean:  ", round(mean(maxtp), 3), "°C\n")
+cat("Median:", median(maxtp),         "°C\n")
+cat("SD:    ", round(sd(maxtp),   3), "°C\n")
+cat("IQR:   ", IQR(maxtp),            "°C\n")
+quantile(maxtp, probs=c(0.25, 0.75))
+```
+
+The mean (≈ 8.61°C) is slightly below the median (9.0°C), consistent with the
+cold spell in mid-January pulling the mean down.
+
+**Try it:** `summary()` gives the five-number summary plus the mean in one
+call. Run it, then try adding a large fake outlier to see how the mean shifts
+but the median barely moves.
+
+```{r ex-summaries, exercise=TRUE}
+summary(maxtp)
+
+# Add a fake extreme cold day and compare
+maxtp_with_outlier <- c(maxtp, -5)
+cat("\nWith outlier:\n")
+cat("Mean:  ", round(mean(maxtp_with_outlier), 3), "\n")
+cat("Median:", median(maxtp_with_outlier),          "\n")
+```
+
+---
+
+## 4. Outlier check
+
+```{r outliers}
+Q1 <- quantile(maxtp, 0.25)
+Q3 <- quantile(maxtp, 0.75)
+iqr <- Q3 - Q1
+lower_fence <- Q1 - 1.5 * iqr
+upper_fence  <- Q3 + 1.5 * iqr
+cat("Fences: [", round(lower_fence, 2), ",", round(upper_fence, 2), "]\n")
+outliers <- maxtp[maxtp < lower_fence | maxtp > upper_fence]
+cat("Outliers:", if (length(outliers) == 0) "none" else outliers, "\n")
+```
+
+**Try it:** Change the multiplier from 1.5 to 3.0 (Tukey's far-out rule).
+Does any value get flagged?
+
+```{r ex-outliers, exercise=TRUE}
+Q1 <- quantile(maxtp, 0.25)
+Q3 <- quantile(maxtp, 0.75)
+iqr <- Q3 - Q1
+multiplier <- 1.5   # try changing this to 3.0
+
+lower <- Q1 - multiplier * iqr
+upper <- Q3 + multiplier * iqr
+cat("Fences: [", round(lower, 2), ",", round(upper, 2), "]\n")
+maxtp[maxtp < lower | maxtp > upper]
+```
+
+---
+
+## 5. ECDF and KDE
+
+```{r ecdf-kde, fig.width=10}
+par(mfrow=c(1,2))
+plot(ecdf(maxtp), main="ECDF", xlab="Temperature (°C)",
+     ylab=expression(hat(F)(x)), col="steelblue", lwd=2, pch=NA)
+
+plot(density(maxtp, bw="SJ"), main="KDE (SJ bandwidth)",
+     xlab="Temperature (°C)", ylab="Density",
+     col="steelblue", lwd=2)
+polygon(density(maxtp, bw="SJ"),
+        col=adjustcolor("steelblue", 0.2), border=NA)
+```
+
+**Try it:** The bandwidth `bw` controls smoothness. Replace `"SJ"` with a
+number (e.g. `0.5`, `1`, `3`) and see how the KDE changes.
+
+```{r ex-kde, exercise=TRUE}
+plot(density(maxtp, bw="SJ"), lwd=2, col="steelblue",
+     main="KDE — try changing bw",
+     xlab="Temperature (°C)", ylab="Density")
+# Try: bw=0.5, bw=1, bw=3
+```
+
+---
+
+## 6. Time series plot
+
+Since we have 31 consecutive daily observations, a time series plot is also
+informative.
+
+```{r timeseries}
+plot(1:31, maxtp, type="b", pch=19, col="steelblue",
+     main="Cork Airport daily max temp, January 2023",
+     xlab="Day of January", ylab="Temperature (°C)")
+abline(h=mean(maxtp), col="coral", lty=2, lwd=1.5)
+```
+
+The cold snap around days 16–18 (3.2°C and 3.7°C) is immediately visible.
+
+**Try it:** Add a smoothed trend line using `lines(lowess(...))`.
+
+```{r ex-timeseries, exercise=TRUE}
+plot(1:31, maxtp, type="b", pch=19, col="steelblue",
+     main="Cork Airport — add a smooth trend",
+     xlab="Day of January", ylab="Temperature (°C)")
+abline(h=mean(maxtp), col="coral", lty=2)
+
+# Add a LOWESS smooth — try changing f (span) between 0.2 and 0.8
+lines(lowess(1:31, maxtp, f=0.4), col="red", lwd=2)
+```

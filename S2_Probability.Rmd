@@ -1,0 +1,217 @@
+---
+title: "ST5005 — Section 2: Probability in R"
+subtitle: "Self-study companion"
+author: "Statistics, School of Mathematical Sciences, University College Cork"
+date: "2026-27"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+    theme: flatly
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo=TRUE, fig.height=3.5, fig.width=6,
+                      fig.align="center", comment="")
+set.seed(42)
+N <- 100000
+die1 <- sample(1:6, N, replace=TRUE)
+die2 <- sample(1:6, N, replace=TRUE)
+total <- die1 + die2
+```
+
+## Introduction
+
+R is not needed to *prove* probability rules, but simulation lets you
+**verify** them to arbitrary precision. 
+All simulations below use `set.seed()` for reproducibility.
+
+---
+
+## 1. Simulating a sample space
+
+Roll two fair dice 100,000 times and estimate $P(\text{sum} = 7)$.
+
+```{r dice}
+set.seed(42)
+N <- 100000
+die1  <- sample(1:6, N, replace=TRUE)
+die2  <- sample(1:6, N, replace=TRUE)
+total <- die1 + die2
+
+mean(total == 7)   # simulated probability
+1/6                # exact probability
+```
+
+**Try it:** Change the target sum. What is the simulated probability of rolling
+a sum of 2 (snake eyes)? Of 12? Compare to the exact values.
+
+```{r ex-dice, exercise=TRUE}
+set.seed(42)
+N     <- 100000
+die1  <- sample(1:6, N, replace=TRUE)
+die2  <- sample(1:6, N, replace=TRUE)
+total <- die1 + die2
+
+# Change the target value below
+target <- 7
+mean(total == target)
+```
+
+**Try it:** Plot the full distribution of sums and compare to the theoretical
+probabilities.
+
+```{r ex-dice-plot, exercise=TRUE}
+set.seed(42)
+total <- sample(1:6, 100000, replace=TRUE) +
+         sample(1:6, 100000, replace=TRUE)
+
+barplot(table(total) / 100000, col="steelblue", border="white",
+        main="Simulated distribution of sum of two dice",
+        xlab="Sum", ylab="Relative frequency")
+```
+
+---
+
+## 2. Verifying the addition rule
+
+Let $A$ = {sum > 9}, $B$ = {at least one 6}.
+Verify $P(A \cup B) = P(A) + P(B) - P(A \cap B)$.
+
+```{r addition-rule}
+set.seed(42)
+N     <- 100000
+die1  <- sample(1:6, N, replace=TRUE)
+die2  <- sample(1:6, N, replace=TRUE)
+total <- die1 + die2
+
+A <- total > 9
+B <- die1 == 6 | die2 == 6
+
+pA   <- mean(A)
+pB   <- mean(B)
+pAB  <- mean(A & B)
+pAuB <- mean(A | B)
+
+cat("P(A)             =", round(pA,   4), "\n")
+cat("P(B)             =", round(pB,   4), "\n")
+cat("P(A ∩ B)         =", round(pAB,  4), "\n")
+cat("P(A ∪ B) direct  =", round(pAuB, 4), "\n")
+cat("P(A)+P(B)-P(A∩B) =", round(pA + pB - pAB, 4), "\n")
+```
+
+**Try it:** Define a new event $C$ = {both dice show the same face} and
+compute $P(B \cup C)$ both directly and via the addition rule.
+
+```{r ex-addition, exercise=TRUE}
+set.seed(42)
+N     <- 100000
+die1  <- sample(1:6, N, replace=TRUE)
+die2  <- sample(1:6, N, replace=TRUE)
+
+B <- die1 == 6 | die2 == 6
+C <- die1 == die2   # doubles
+
+# Fill in:
+pB   <- mean(B)
+pC   <- mean(C)
+pBC  <- mean(B & C)
+pBuC <- mean(B | C)
+
+cat("P(B)             =", round(pB,   4), "\n")
+cat("P(C)             =", round(pC,   4), "\n")
+cat("P(B ∩ C)         =", round(pBC,  4), "\n")
+cat("P(B ∪ C) direct  =", round(pBuC, 4), "\n")
+cat("P(B)+P(C)-P(B∩C) =", round(pB + pC - pBC, 4), "\n")
+```
+
+---
+
+## 3. Conditional probability
+
+Estimate $P(A \mid B)$ — probability sum > 9 given at least one die shows 6.
+
+```{r conditional}
+set.seed(42)
+N     <- 100000
+die1  <- sample(1:6, N, replace=TRUE)
+die2  <- sample(1:6, N, replace=TRUE)
+total <- die1 + die2
+A <- total > 9
+B <- die1 == 6 | die2 == 6
+
+mean(total[B] > 9)      # P(A | B) by filtering
+mean(A & B) / mean(B)   # equivalent: P(A∩B) / P(B)
+```
+
+**Try it:** Compute $P(B \mid A)$ — at least one 6, given sum > 9. Check the
+multiplication rule: $P(A \cap B) = P(B \mid A) \times P(A)$.
+
+```{r ex-conditional, exercise=TRUE}
+set.seed(42)
+N     <- 100000
+die1  <- sample(1:6, N, replace=TRUE)
+die2  <- sample(1:6, N, replace=TRUE)
+total <- die1 + die2
+A <- total > 9
+B <- die1 == 6 | die2 == 6
+
+pB_given_A <- mean(B[A])
+pA         <- mean(A)
+cat("P(B|A)          =", round(pB_given_A, 4), "\n")
+cat("P(B|A) × P(A)   =", round(pB_given_A * pA, 4), "\n")
+cat("P(A ∩ B) direct =", round(mean(A & B), 4), "\n")
+```
+
+---
+
+## 4. Bayes' theorem — diagnostic test
+
+Reproduce the HSE screening example from Tutorial 2.
+
+```{r bayes}
+pD   <- 0.08    # prevalence
+sens <- 0.92    # P(T+ | D)
+spec <- 0.87    # P(T- | D^c), so P(T+ | D^c) = 1 - spec
+
+pTplus <- sens * pD + (1 - spec) * (1 - pD)   # law of total probability
+PPV    <- sens * pD / pTplus                    # Bayes: P(D | T+)
+NPV    <- spec * (1 - pD) / (1 - pTplus)       # P(D^c | T-)
+
+cat("P(T+) =", round(pTplus, 4), "\n")
+cat("PPV   =", round(PPV,    4), "\n")
+cat("NPV   =", round(NPV,    4), "\n")
+```
+
+**Try it:** How does the PPV change if the prevalence rises to 20%? To 50%?
+Edit `pD` below and re-run.
+
+```{r ex-bayes, exercise=TRUE}
+pD   <- 0.08   # try 0.20, 0.50
+sens <- 0.92
+spec <- 0.87
+
+pTplus <- sens * pD + (1 - spec) * (1 - pD)
+PPV    <- sens * pD / pTplus
+
+cat("Prevalence:", pD, "\n")
+cat("PPV:       ", round(PPV, 4), "\n")
+```
+
+**Try it:** Plot how PPV varies across the full range of possible prevalences.
+
+```{r ex-bayes-plot, exercise=TRUE}
+prev_seq <- seq(0.01, 0.50, by=0.01)
+ppv_seq  <- (0.92 * prev_seq) /
+            (0.92 * prev_seq + 0.13 * (1 - prev_seq))
+
+plot(prev_seq, ppv_seq, type="l", lwd=2, col="steelblue",
+     xlab="Prevalence P(D)", ylab="PPV",
+     main="How PPV depends on disease prevalence")
+abline(v=0.08, lty=2, col="coral")
+text(0.09, 0.15, "8% prevalence\n(Tutorial 2)", adj=0, cex=0.8)
+
+# Try changing sensitivity and specificity and see how the curve shifts
+```

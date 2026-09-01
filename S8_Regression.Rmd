@@ -1,0 +1,187 @@
+---
+title: "ST5005 — Section 8: Simple Linear Regression in R"
+subtitle: "Self-study companion"
+author: "Statistics, School of Mathematical Sciences, University College Cork"
+date: "2026-27"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+    theme: flatly
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo=TRUE, fig.height=3.5, fig.width=6,
+                      fig.align="center", comment="")
+maxtp <- c(8.2, 8.4, 11.9, 11.6, 11.0, 10.1, 8.3,  6.4,  6.7, 11.7,
+           11.1,11.1,  9.9,  9.9,  7.1,  3.7,  3.2,  5.1,  5.5,  7.5,
+            9.0, 9.4,  8.5,  8.9, 10.4,  7.1,  6.1,  9.7, 10.9,  9.0, 9.5)
+```
+
+## 1. Fitting a simple linear regression
+
+The `cars` dataset: stopping distance (ft) at various speeds (mph).
+
+```{r fit}
+fit <- lm(dist ~ speed, data=cars)
+summary(fit)
+```
+
+Key output:
+
+- **Slope** ($\hat{\beta}_1 = 3.93$): each extra mph is associated with 3.93 ft of additional stopping distance on average.
+- **$R^2 = 0.651$**: speed explains 65.1% of the variation in stopping distance.
+
+**Try it:** Extract individual components of the model fit.
+
+```{r ex-fit, exercise=TRUE}
+fit <- lm(dist ~ speed, data=cars)
+
+cat("Intercept:", round(coef(fit)[1], 4), "\n")
+cat("Slope:    ", round(coef(fit)[2], 4), "\n")
+cat("R-squared:", round(summary(fit)$r.squared, 4), "\n")
+cat("Residual SE:", round(summary(fit)$sigma, 4), "\n")
+```
+
+---
+
+## 2. Scatter plot with fitted line
+
+```{r scatter}
+plot(dist ~ speed, data=cars, pch=19, col="steelblue",
+     main="Stopping distance vs speed",
+     xlab="Speed (mph)", ylab="Stopping distance (ft)")
+abline(fit, col="coral", lwd=2)
+legend("topleft",
+       legend=c("Observed",
+                sprintf("Fitted: %.2f + %.2f × speed",
+                        coef(fit)[1], coef(fit)[2])),
+       pch=c(19, NA), lty=c(NA, 1),
+       col=c("steelblue","coral"), bty="n", cex=0.8)
+```
+
+**Try it:** Make a prediction for a car travelling at 22 mph, both manually
+and using `predict()`. Add the point to the plot.
+
+```{r ex-predict, exercise=TRUE}
+fit <- lm(dist ~ speed, data=cars)
+
+# Manual prediction
+b0 <- coef(fit)[1]; b1 <- coef(fit)[2]
+speed_new <- 22
+cat("Manual prediction:", round(b0 + b1 * speed_new, 2), "ft\n")
+
+# Using predict()
+cat("predict() result: ",
+    round(predict(fit, newdata=data.frame(speed=speed_new)), 2), "ft\n")
+
+# Plot with prediction
+plot(dist ~ speed, data=cars, pch=19, col="steelblue",
+     main="Prediction at speed = 22 mph")
+abline(fit, col="coral", lwd=2)
+points(speed_new, predict(fit, newdata=data.frame(speed=speed_new)),
+       pch=19, col="red", cex=1.5)
+```
+
+---
+
+## 3. Confidence and prediction intervals
+
+```{r intervals, fig.width=7}
+new_speed <- data.frame(speed=seq(4, 25, by=0.5))
+ci <- predict(fit, newdata=new_speed, interval="confidence")
+pi <- predict(fit, newdata=new_speed, interval="prediction")
+
+plot(dist ~ speed, data=cars, pch=19, col="steelblue",
+     main="95% confidence and prediction intervals")
+lines(new_speed$speed, ci[,"fit"], col="coral",    lwd=2)
+lines(new_speed$speed, ci[,"lwr"], col="coral",    lwd=1, lty=2)
+lines(new_speed$speed, ci[,"upr"], col="coral",    lwd=1, lty=2)
+lines(new_speed$speed, pi[,"lwr"], col="seagreen", lwd=1, lty=3)
+lines(new_speed$speed, pi[,"upr"], col="seagreen", lwd=1, lty=3)
+legend("topleft",
+       legend=c("Fitted","95% CI for mean","95% PI for new obs"),
+       col=c("coral","coral","seagreen"), lwd=2, lty=c(1,2,3),
+       bty="n", cex=0.8)
+```
+
+**Try it:** At speed = 15 mph, compute both intervals manually and compare
+to the plot.
+
+```{r ex-intervals, exercise=TRUE}
+fit <- lm(dist ~ speed, data=cars)
+new <- data.frame(speed=15)
+
+ci <- predict(fit, newdata=new, interval="confidence", level=0.95)
+pi <- predict(fit, newdata=new, interval="prediction", level=0.95)
+
+cat("At speed = 15 mph:\n")
+cat("Fitted value:  ", round(ci[,"fit"], 2), "ft\n")
+cat("95% CI:  (", round(ci[,"lwr"],2), ",", round(ci[,"upr"],2), ")\n")
+cat("95% PI:  (", round(pi[,"lwr"],2), ",", round(pi[,"upr"],2), ")\n")
+cat("PI is wider by:", round(diff(pi[,2:3]) - diff(ci[,2:3]), 2), "ft\n")
+```
+
+---
+
+## 4. Diagnostic plots
+
+```{r diagnostics, fig.width=10}
+par(mfrow=c(1,3))
+plot(fit, which=1, pch=19, col="steelblue")  # residuals vs fitted
+plot(fit, which=2, pch=19, col="steelblue")  # Q-Q plot
+plot(fit, which=3, pch=19, col="steelblue")  # scale-location
+```
+
+A slight fan shape in the residuals vs fitted plot suggests mild
+heteroscedasticity — variance increases with speed.
+
+**Try it:** Fit a model with `sqrt(dist)` as the response and re-examine
+the diagnostic plots. Does the heteroscedasticity improve?
+
+```{r ex-diagnostics, exercise=TRUE}
+fit_sqrt <- lm(sqrt(dist) ~ speed, data=cars)
+par(mfrow=c(1,2))
+plot(fit_sqrt, which=1, pch=19, col="steelblue",
+     main="sqrt(dist) ~ speed: residuals vs fitted")
+plot(fit_sqrt, which=2, pch=19, col="steelblue",
+     main="Q-Q plot")
+```
+
+---
+
+## 5. Is there a linear trend across January?
+
+```{r cork-regression}
+maxtp <- c(8.2, 8.4, 11.9, 11.6, 11.0, 10.1, 8.3,  6.4,  6.7, 11.7,
+           11.1,11.1,  9.9,  9.9,  7.1,  3.7,  3.2,  5.1,  5.5,  7.5,
+            9.0, 9.4,  8.5,  8.9, 10.4,  7.1,  6.1,  9.7, 10.9,  9.0, 9.5)
+day <- 1:31
+fit_cork <- lm(maxtp ~ day)
+summary(fit_cork)
+```
+
+The slope is close to zero and $p > 0.05$: no significant linear trend.
+
+**Try it:** Plot the data with the fitted trend line, and add a LOWESS
+smooth to see the non-linear pattern.
+
+```{r ex-cork-regression, exercise=TRUE}
+maxtp <- c(8.2, 8.4, 11.9, 11.6, 11.0, 10.1, 8.3,  6.4,  6.7, 11.7,
+           11.1,11.1,  9.9,  9.9,  7.1,  3.7,  3.2,  5.1,  5.5,  7.5,
+            9.0, 9.4,  8.5,  8.9, 10.4,  7.1,  6.1,  9.7, 10.9,  9.0, 9.5)
+day <- 1:31
+fit_cork <- lm(maxtp ~ day)
+
+plot(day, maxtp, type="b", pch=19, col="steelblue",
+     main="Cork Airport: daily max temp, January 2023",
+     xlab="Day of January", ylab="Temperature (°C)")
+abline(fit_cork, col="coral", lwd=2, lty=2)
+lines(lowess(day, maxtp, f=0.4), col="red", lwd=2)
+legend("topright",
+       legend=c("Data","OLS trend","LOWESS smooth"),
+       col=c("steelblue","coral","red"),
+       lty=c(1,2,1), pch=c(19,NA,NA), bty="n", cex=0.8)
+```

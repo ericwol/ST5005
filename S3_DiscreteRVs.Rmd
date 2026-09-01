@@ -1,0 +1,199 @@
+---
+title: "ST5005 — Section 3: Discrete Random Variables in R"
+subtitle: "Self-study companion"
+author: "Statistics, School of Mathematical Sciences, University College Cork"
+date: "2026-27"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+    theme: flatly
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo=TRUE, fig.height=3.5, fig.width=6,
+                      fig.align="center", comment="")
+```
+
+## R's distribution naming convention
+
+R uses a consistent four-prefix system for every distribution:
+
+| Prefix | Meaning | Binomial example |
+|--------|---------|-----------------|
+| `d`    | PMF / PDF at a point | `dbinom(k, n, p)` |
+| `p`    | CDF: $P(X \leq x)$  | `pbinom(k, n, p)` |
+| `q`    | Quantile (inverse CDF) | `qbinom(prob, n, p)` |
+| `r`    | Random sample | `rbinom(N, n, p)` |
+
+---
+
+## 1. Binomial distribution
+
+$X \sim \mathrm{Bin}(n=12,\, p=0.25)$: number of clinic patients requiring
+a follow-up referral (Tutorial 4 scenario).
+
+```{r binomial}
+n <- 12;  p <- 0.25
+
+dbinom(3, n, p)           # P(X = 3)
+pbinom(2, n, p)           # P(X <= 2)
+1 - pbinom(4, n, p)       # P(X >= 5)
+```
+
+```{r binom-plot, fig.width=9}
+x <- 0:n
+par(mfrow=c(1,2))
+barplot(dbinom(x, n, p), names.arg=x, col="steelblue", border="white",
+        main="PMF: Bin(12, 0.25)", xlab="x", ylab="P(X = x)")
+plot(x, pbinom(x, n, p), type="s", lwd=2, col="steelblue",
+     main="CDF: Bin(12, 0.25)", xlab="x", ylab="P(X ≤ x)")
+```
+
+**Try it:** Change $n$ and $p$ and observe how the PMF shape changes. Try
+$p=0.5$ (symmetric), $p=0.1$ (right-skewed), $p=0.9$ (left-skewed).
+
+```{r ex-binom, exercise=TRUE}
+n <- 12
+p <- 0.25   # try 0.5, 0.1, 0.9
+
+barplot(dbinom(0:n, n, p), names.arg=0:n,
+        col="steelblue", border="white",
+        main=paste0("PMF: Bin(", n, ", ", p, ")"),
+        xlab="x", ylab="P(X = x)")
+abline(v=n*p, col="coral", lwd=2, lty=2)  # mark the mean
+```
+
+**Try it:** Compute the exact probabilities for Tutorial 4 Q3.
+
+```{r ex-binom-tutorial, exercise=TRUE}
+n <- 12; p <- 0.25
+cat("P(X = 3)  =", round(dbinom(3, n, p), 4), "\n")
+cat("P(X <= 2) =", round(pbinom(2, n, p), 4), "\n")
+cat("P(X >= 5) =", round(1 - pbinom(4, n, p), 4), "\n")
+
+# Now try n=20, p=0.3 and find P(X >= 8)
+```
+
+---
+
+## 2. Poisson distribution
+
+Fitting to the road collision data from Tutorial 5.
+
+```{r poisson-fit}
+obs <- c(9, 18, 14, 7, 3, 1)   # observed counts for k = 0,1,2,3,4,>=5
+k   <- 0:5
+
+lambda_hat <- sum(k * obs) / sum(obs)
+cat("Estimated lambda:", round(lambda_hat, 4), "\n")
+
+p_k   <- dpois(0:4, lambda_hat)
+p_5p  <- 1 - sum(p_k)
+exp_f <- c(p_k, p_5p) * 52
+
+data.frame(k        = c(0:4, ">=5"),
+           Observed = obs,
+           Expected = round(exp_f, 2))
+```
+
+**Try it:** Simulate 52 weeks of collision counts from the fitted Poisson
+model and compare to what was observed.
+
+```{r ex-poisson-sim, exercise=TRUE}
+set.seed(1)
+lambda_hat <- 1.615
+simulated  <- rpois(52, lambda_hat)
+
+obs <- c(9, 18, 14, 7, 3, 1)
+sim_table <- table(factor(pmin(simulated, 5), levels=0:5))
+data.frame(k        = c(0:4, ">=5"),
+           Observed = obs,
+           Simulated= as.integer(sim_table))
+```
+
+**Try it:** Use the Poisson CDF for the hospital emergency department problem
+(Tutorial 5, Q2). Average 6 patients per hour.
+
+```{r ex-poisson-probs, exercise=TRUE}
+lambda <- 6
+
+cat("P(X < 4)  =", round(ppois(3, lambda), 4), "\n")
+cat("P(X >= 9) =", round(1 - ppois(8, lambda), 4), "\n")
+
+# 4-hour shift: lambda scales linearly
+cat("E[arrivals in 4 hrs] =", 4 * lambda, "\n")
+cat("P(>30 in 4 hrs) =",
+    round(1 - ppois(30, 4*lambda), 4), "\n")
+```
+
+---
+
+## 3. Geometric distribution
+
+$Y \sim \mathrm{Geom}(p=0.10)$: items inspected until the first defective.
+
+```{r geometric}
+p_def <- 0.10
+
+# R parameterises Geom as number of FAILURES before first success
+# So P(Y = 5) = dgeom(4, p)  [4 failures then 1 success]
+dgeom(4, p_def)          # P(Y = 5)
+pgeom(7, p_def, lower.tail=FALSE)   # P(Y > 8)
+
+cat("E[Y] =", 1 / p_def, "\n")
+```
+
+> **R's parameterisation:** `dgeom(k, p)` gives the probability of $k$
+> *failures* before the first success. So $P(Y = 5)$ (5th item is first
+> defective) = `dgeom(4, p)`.
+
+**Try it:** Verify the memoryless property by simulation. Generate 100,000
+Geometric draws and check that the conditional distribution of $Y - 4$
+given $Y > 4$ looks the same as the unconditional distribution.
+
+```{r ex-geometric, exercise=TRUE}
+set.seed(42)
+p   <- 0.10
+y   <- rgeom(100000, p) + 1   # +1 to convert failures to trials
+
+# Unconditional: all draws
+cat("Unconditional P(Y <= 5):", round(mean(y <= 5), 4), "\n")
+
+# Conditional on Y > 4 (memoryless: should equal P(Y <= 5))
+y_given_gt4 <- y[y > 4] - 4
+cat("P(Y <= 5 | Y > 4):     ", round(mean(y_given_gt4 <= 5), 4), "\n")
+```
+
+---
+
+## 4. Checking mean = variance for Poisson
+
+A key diagnostic: for a Poisson distribution, $E[X] = \text{Var}(X) = \lambda$.
+
+```{r poisson-meanvar}
+set.seed(42)
+x_sim <- rpois(10000, lambda=1.615)
+cat("Simulated mean:    ", round(mean(x_sim), 3), "\n")
+cat("Simulated variance:", round(var(x_sim),  3), "\n")
+```
+
+**Try it:** Generate samples from a Binomial and check whether its mean
+equals its variance. Under what condition would they be approximately equal?
+
+```{r ex-meanvar, exercise=TRUE}
+set.seed(7)
+x_bin <- rbinom(10000, size=20, prob=0.5)
+cat("Binomial mean:    ", round(mean(x_bin), 3), "\n")
+cat("Binomial variance:", round(var(x_bin),  3), "\n")
+cat("np =", 20*0.5, "  np(1-p) =", 20*0.5*0.5, "\n")
+
+# For Poisson approx to hold we need n large and p small.
+# Try size=200, prob=0.008 (so np = 1.6 ≈ lambda_hat):
+x_approx <- rbinom(10000, size=200, prob=0.008)
+cat("\nApprox Bin(200, 0.008):\n")
+cat("mean:    ", round(mean(x_approx), 3), "\n")
+cat("variance:", round(var(x_approx),  3), "\n")
+```
